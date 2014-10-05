@@ -156,9 +156,6 @@
         },
         getPosition: function() {
           return player.currentTime * 1000;
-        },
-        setVolume: function(val) {
-          player.volume = val / 100;
         }
       };
 
@@ -232,13 +229,7 @@
         },
         getPosition: function() {
           return player && player.api_getTrackPosition && player.api_getTrackPosition() * 1000;
-        },
-        setVolume: function(val) {
-          if(player && player.api_setVolume){
-            player.api_setVolume(val);
-          }
         }
-
       };
     };
 
@@ -310,11 +301,6 @@
       updateTrackInfo = function($player, track) {
         // update the current track info in the player
         // log('updateTrackInfo', track);
-        $('.sc-info', $player).each(function(index) {
-          $('h3', this).html('<a href="' + track.permalink_url +'">' + track.title + '</a>');
-          $('h4', this).html('by <a href="' + track.user.permalink_url +'">' + track.user.username + '</a>');
-          $('p', this).html(track.description || 'no Description');
-        });
         // update the artwork
         $('.sc-artwork-list li', $player).each(function(index) {
           var $item = $(this),
@@ -336,8 +322,6 @@
         });
         // update the track duration in the progress bar
         $('.sc-duration', $player).html(timecode(track.duration));
-        // put the waveform into the progress bar
-        $('.sc-waveform-container', $player).html('<img src="' + track.waveform_url +'" />');
 
         $player.trigger('onPlayerTrackSwitch.scPlayer', [track]);
       },
@@ -407,38 +391,13 @@
           $nextItem = $player.nextAll('div.sc-player:first').find('.sc-trackslist li.active');
         }
         $nextItem.click();
-      },
-      soundVolume = function() {
-        var vol = 80,
-            cooks = document.cookie.split(';'),
-            volRx = new RegExp('scPlayer_volume=(\\d+)');
-        for(var i in cooks){
-          if(volRx.test(cooks[i])){
-            vol = parseInt(cooks[i].match(volRx)[1], 10);
-            break;
-          }
-        }
-        return vol;
-      }(),
-      onVolume = function(volume) {
-        var vol = Math.floor(volume);
-        // save the volume in the cookie
-        var date = new Date();
-        date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
-        soundVolume = vol;
-        document.cookie = ['scPlayer_volume=', vol, '; expires=', date.toUTCString(), '; path="/"'].join('');
-        // update the volume in the engine
-        audioEngine.setVolume(soundVolume);
-      },
-      positionPoll;
+      }, positionPoll;
 
     // listen to audio engine events
     $doc
       .bind('scPlayer:onAudioReady', function(event) {
         log('onPlayerReady: audio engine is ready');
         audioEngine.play();
-        // set initial volume
-        onVolume(soundVolume);
       })
       // when the loaded track started to play
       .bind('scPlayer:onMediaPlay', function(event) {
@@ -466,10 +425,6 @@
         clearInterval(positionPoll);
         positionPoll = null;
       })
-      // change the volume
-      .bind('scPlayer:onVolumeChange', function(event) {
-        onVolume(event.volume);
-      })
       .bind('scPlayer:onMediaEnd', function(event) {
         onFinish();
       })
@@ -487,7 +442,6 @@
         links = opts.links || $.map($('a', $source).add($source.filter('a')), function(val) { return {url: val.href, title: val.innerHTML}; }),
         $player = $('<div class="sc-player loading"></div>').data('sc-player', {id: playerId}),
         $artworks = $('<ol class="sc-artwork-list"></ol>').appendTo($player),
-        $info = $('<div class="sc-info"><h3></h3><h4></h4><p></p><a href="#" class="sc-info-close">X</a></div>').appendTo($player),
         $controls = $('<div class="sc-controls"></div>').appendTo($player),
         $list = $('<ol class="sc-trackslist"></ol>').appendTo($player);
 
@@ -501,13 +455,11 @@
         // adding controls to the player
         $player
           .find('.sc-controls')
-            .append('<a href="#play" class="sc-play">Play</a> <a href="#pause" class="sc-pause hidden">Pause</a>')
+            .append('<i class="fa fa-play sc-play"></i><i class="fa fa-pause sc-pause"></i>')
           .end()
-          .append('<a href="#info" class="sc-info-toggle">Info</a>')
           .append('<div class="sc-scrubber"></div>')
             .find('.sc-scrubber')
-              .append('<div class="sc-volume-slider"><span class="sc-volume-status" style="width:' + soundVolume +'%"></span></div>')
-              .append('<div class="sc-time-span"><div class="sc-waveform-container"></div><div class="sc-buffer"></div><div class="sc-played"></div></div>')
+              .append('<div class="sc-time-span"><div class="sc-buffer"></div><div class="sc-played"></div></div>')
               .append('<div class="sc-time-indicators"><span class="sc-position"></span> | <span class="sc-duration"></span></div>');
 
         // load and parse the track data from SoundCloud API
@@ -617,22 +569,13 @@
   //--------------------------------------------------------
 
   // toggling play/pause
-  $(document).on('click','a.sc-play, a.sc-pause', function(event) {
+  $(document).on('click','.sc-play, .sc-pause', function(event) {
     var $list = $(this).closest('.sc-player').find('ol.sc-trackslist');
     // simulate the click in the tracklist
     $list.find('li.active').click();
     return false;
   });
-
-  // displaying the info panel in the player
-  $(document).on('click','a.sc-info-toggle, a.sc-info-close', function(event) {
-    var $link = $(this);
-    $link.closest('.sc-player')
-      .find('.sc-info').toggleClass('active').end()
-      .find('a.sc-info-toggle').toggleClass('active');
-    return false;
-  });
-
+  
   // selecting tracks in the playlist
   $(document).on('click','.sc-trackslist li', function(event) {
     var $track = $(this),
@@ -682,37 +625,6 @@
       this.removeEventListener('touchmove', onTouchMove, false);
       event.originalEvent.preventDefault();
     });
-
-  // changing volume in the player
-  var startVolumeTracking = function(node, startEvent) {
-    var $node = $(node),
-        originX = $node.offset().left,
-        originWidth = $node.width(),
-        getVolume = function(x) {
-          return Math.floor(((x - originX)/originWidth)*100);
-        },
-        update = function(event) {
-          $doc.trigger({type: 'scPlayer:onVolumeChange', volume: getVolume(event.pageX)});
-        };
-    $node.bind('mousemove.sc-player', update);
-    update(startEvent);
-  };
-
-  var stopVolumeTracking = function(node, event) {
-    $(node).unbind('mousemove.sc-player');
-  };
-
-  $(document)
-    .on('mousedown','.sc-volume-slider', function(event) {
-      startVolumeTracking(this, event);
-    })
-    .on('mouseup','.sc-volume-slider', function(event) {
-      stopVolumeTracking(this, event);
-    });
-
-  $doc.bind('scPlayer:onVolumeChange', function(event) {
-    $('span.sc-volume-status').css({width: event.volume + '%'});
-  });
   // -------------------------------------------------------------------
 
   // the default Auto-Initialization
