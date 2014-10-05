@@ -72,7 +72,7 @@ display: table;
   padding: 5px;
 }
 
- .sc-player:hover .sc-scrubber, .sc-player.playing .sc-scrubber {
+.sc-player.playing .sc-scrubber {
   display: block;
   left: 35px;
   bottom: 10px;
