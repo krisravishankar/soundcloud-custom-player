@@ -75,7 +75,7 @@ display: table;
 .sc-player.playing .sc-scrubber {
   display: block;
   left: 35px;
-  bottom: 10px;
+  bottom: 7px;
 }
 
 .sc-scrubber .sc-time-span{
